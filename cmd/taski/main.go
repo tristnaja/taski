@@ -76,8 +76,8 @@ func main() {
 		fmt.Printf("%v\n", value.Description)
 		fmt.Printf("Date: %v\n", value.Date)
 	}
-
-	err = io.RemoveTask(fileName, 1)
+	//
+	err = io.RemoveTask(fileName, 0)
 
 	if err != nil {
 		log.Fatal(err)

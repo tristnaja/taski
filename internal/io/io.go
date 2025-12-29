@@ -22,63 +22,59 @@ type Database struct {
 }
 
 func AddTask(task *Task, fileName string) error {
-	var jsonData []byte
-	var err error
-	var existingDB Database
-	var file *os.File
-
-	file, err = os.OpenFile(fileName, os.O_RDWR, 0644)
+	db, err := ReadTask(fileName)
 
 	if err != nil {
-		file.Close()
-		os.WriteFile(fileName, nil, 0644)
-		file, err = os.OpenFile(fileName, os.O_RDWR, 0644)
+		return fmt.Errorf("reading file: %w", err)
+	}
 
-		if err != nil {
-			return fmt.Errorf("opening file: %w", err)
-		}
+	db.Tasks = append(db.Tasks, *task)
+	db.Capacity++
+
+	file, err := os.OpenFile(fileName, os.O_TRUNC|os.O_RDWR, 0644)
+
+	if err != nil {
+		return fmt.Errorf("opening file: %w", err)
 	}
 
 	defer file.Close()
 
-	data, err := io.ReadAll(file)
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "\t")
+
+	err = encoder.Encode(db)
 
 	if err != nil {
-		return fmt.Errorf("turning file to bytes: ")
-	}
-
-	json.Unmarshal(data, &existingDB)
-
-	existingDB.Tasks = append(existingDB.Tasks, *task)
-	existingDB.Capacity++
-
-	jsonData, err = json.MarshalIndent(existingDB, "", "\t")
-
-	if err != nil {
-		return fmt.Errorf("json indenting: %w", err)
-	}
-
-	err = os.WriteFile(fileName, jsonData, 0644)
-
-	if err != nil {
-		return fmt.Errorf("adding task: %w", err)
+		return fmt.Errorf("encoding file: %w", err)
 	}
 
 	return nil
 }
 
-func ReadTask(fileName string) (*Database, error) {
+func ReadTask(fileName string) (Database, error) {
 	var result Database
 
-	message, err := os.ReadFile(fileName)
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDONLY, 0644)
 
 	if err != nil {
-		return &Database{}, fmt.Errorf("reading task: %w", err)
+		return Database{}, fmt.Errorf("opening file: %w", err)
 	}
 
-	json.Unmarshal(message, &result)
+	defer file.Close()
 
-	return &result, nil
+	decoder := json.NewDecoder(file)
+
+	err = decoder.Decode(&result)
+
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			result = Database{}
+		} else {
+			return Database{}, fmt.Errorf("decoding file: %w", err)
+		}
+	}
+
+	return result, nil
 }
 
 func ChangeTask(fileName string, taskIndex int, newTitle string, newDescription string) error {
@@ -90,25 +86,11 @@ func ChangeTask(fileName string, taskIndex int, newTitle string, newDescription 
 		return errors.New("No value is changed")
 	}
 
-	var db Database
-	var err error
-	var file *os.File
-
-	file, err = os.OpenFile(fileName, os.O_RDWR, 0644)
+	db, err := ReadTask(fileName)
 
 	if err != nil {
-		return fmt.Errorf("opening file: %w", err)
+		return fmt.Errorf("reading file: %w", err)
 	}
-
-	defer file.Close()
-
-	data, err := io.ReadAll(file)
-
-	if err != nil {
-		return fmt.Errorf("turning file to bytes: ")
-	}
-
-	json.Unmarshal(data, &db)
 
 	if newTitle == "" {
 		newTitle = db.Tasks[taskIndex].Title
@@ -122,13 +104,18 @@ func ChangeTask(fileName string, taskIndex int, newTitle string, newDescription 
 	db.Tasks[taskIndex].Description = newDescription
 	db.Tasks[taskIndex].Date = time.Now()
 
-	jsonData, err := json.MarshalIndent(db, "", "\t")
+	file, err := os.OpenFile(fileName, os.O_TRUNC|os.O_RDWR, 0644)
 
 	if err != nil {
-		return fmt.Errorf("reading db: %w", err)
+		return fmt.Errorf("opening file: %w", err)
 	}
 
-	err = os.WriteFile(fileName, jsonData, 0644)
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "\t")
+
+	encoder.Encode(db)
 
 	return nil
 }
@@ -142,7 +129,16 @@ func RemoveTask(fileName string, taskIndex int) error {
 	var err error
 	var file *os.File
 
-	file, err = os.OpenFile(fileName, os.O_RDWR, 0644)
+	db, err = ReadTask(fileName)
+
+	if err != nil {
+		return fmt.Errorf("reading file: %w", err)
+	}
+
+	db.Tasks = append(db.Tasks[:taskIndex], db.Tasks[taskIndex+1:]...)
+	db.Capacity--
+
+	file, err = os.OpenFile(fileName, os.O_TRUNC|os.O_RDWR, 0644)
 
 	if err != nil {
 		return fmt.Errorf("opening file: %w", err)
@@ -150,24 +146,10 @@ func RemoveTask(fileName string, taskIndex int) error {
 
 	defer file.Close()
 
-	data, err := io.ReadAll(file)
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "\t")
 
-	if err != nil {
-		return fmt.Errorf("turning file to bytes: ")
-	}
-
-	json.Unmarshal(data, &db)
-
-	db.Tasks = append(db.Tasks[:taskIndex], db.Tasks[taskIndex+1:]...)
-	db.Capacity--
-
-	jsonData, err := json.MarshalIndent(db, "", "\t")
-
-	if err != nil {
-		return fmt.Errorf("reading db: %w", err)
-	}
-
-	err = os.WriteFile(fileName, jsonData, 0644)
+	encoder.Encode(db)
 
 	return nil
 }
