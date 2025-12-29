@@ -98,7 +98,21 @@ func ChangeTask(fileName string, taskIndex int, newTitle string, newDescription 
 }
 
 func RemoveTask(fileName string, taskIndex int) error {
-	softDelete(fileName, taskIndex)
+	err := softDelete(fileName, taskIndex)
+
+	if err != nil {
+		return fmt.Errorf("deleting task: %w", err)
+	}
+
+	return nil
+}
+
+func RestoreTask(fileName string, taskIndex int) error {
+	err := restoreTask(fileName, taskIndex)
+
+	if err != nil {
+		return fmt.Errorf("restoring task: %w", err)
+	}
 
 	return nil
 }
@@ -130,6 +144,27 @@ func CleanUp(fileName string, retention time.Duration) error {
 	}
 
 	db.Tasks = keptTasks
+
+	err = writeJSON(fileName, db)
+
+	if err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
+
+	return nil
+}
+
+func RestoreAll(fileName string, retention time.Duration) error {
+	db, err := readJSON(fileName)
+
+	if err != nil {
+		return fmt.Errorf("reading file: %w", err)
+	}
+
+	for index := range db.Tasks {
+		db.Tasks[index].IsDeleted = false
+		db.Tasks[index].DeletedAt = nil
+	}
 
 	err = writeJSON(fileName, db)
 
@@ -195,6 +230,26 @@ func softDelete(fileName string, taskIndex int) error {
 	db.Tasks[taskIndex].IsDeleted = true
 	db.Tasks[taskIndex].DeletedAt = &now
 	db.Size--
+
+	err = writeJSON(fileName, db)
+
+	if err != nil {
+		return fmt.Errorf("writing into file: %w", err)
+	}
+
+	return nil
+}
+
+func restoreTask(fileName string, taskIndex int) error {
+	db, err := readJSON(fileName)
+
+	if err != nil {
+		return fmt.Errorf("reading file: %w", err)
+	}
+
+	db.Tasks[taskIndex].IsDeleted = false
+	db.Tasks[taskIndex].DeletedAt = nil
+	db.Size++
 
 	err = writeJSON(fileName, db)
 

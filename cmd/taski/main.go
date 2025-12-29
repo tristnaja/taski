@@ -86,6 +86,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = io.RemoveTask(fileName, 1)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	result, err = io.ReadTask(fileName)
 
 	if err != nil {
