@@ -12,6 +12,9 @@ func main() {
 	log.SetPrefix("taski: ")
 	log.SetFlags(0)
 	fileName := "data.json"
+	trashDue := 30 * 24 * time.Hour
+
+	io.CleanUp(fileName, trashDue)
 
 	task := io.Task{
 		Title:       "Test",

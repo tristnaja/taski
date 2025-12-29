@@ -10,27 +10,137 @@ import (
 )
 
 type Task struct {
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Date        time.Time `json:"date"`
-	IsDeleted   bool      `json:"is_deleted"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Date        time.Time  `json:"date"`
+	IsDeleted   bool       `json:"is_deleted"`
+	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
 }
 
 type Database struct {
-	Capacity int    `json:"capacity"`
-	Tasks    []Task `json:"tasks"`
+	Size  int    `json:"size"`
+	Tasks []Task `json:"tasks"`
 }
 
 func AddTask(task *Task, fileName string) error {
-	db, err := ReadTask(fileName)
+	db, err := readJSON(fileName)
 
 	if err != nil {
 		return fmt.Errorf("reading file: %w", err)
 	}
 
 	db.Tasks = append(db.Tasks, *task)
-	db.Capacity++
+	db.Size++
 
+	err = writeJSON(fileName, db)
+
+	if err != nil {
+		return fmt.Errorf("writing into file: %w", err)
+	}
+
+	return nil
+}
+
+func ReadTask(fileName string) (Database, error) {
+	var filteredDB Database
+
+	db, err := readJSON(fileName)
+
+	if err != nil {
+		return Database{}, fmt.Errorf("reading file: %w", err)
+	}
+
+	for _, task := range db.Tasks {
+		if task.IsDeleted == false {
+			filteredDB.Tasks = append(filteredDB.Tasks, task)
+		}
+	}
+
+	filteredDB.Size = db.Size
+
+	return filteredDB, nil
+}
+
+func ChangeTask(fileName string, taskIndex int, newTitle string, newDescription string) error {
+	if taskIndex < 0 {
+		return errors.New("Index cannot be < 0")
+	}
+
+	if newTitle == "" && newDescription == "" {
+		return errors.New("No value is changed")
+	}
+
+	db, err := readJSON(fileName)
+
+	if err != nil {
+		return fmt.Errorf("reading file: %w", err)
+	}
+
+	if newTitle == "" {
+		newTitle = db.Tasks[taskIndex].Title
+	}
+
+	if newDescription == "" {
+		newDescription = db.Tasks[taskIndex].Description
+	}
+
+	db.Tasks[taskIndex].Title = newTitle
+	db.Tasks[taskIndex].Description = newDescription
+	db.Tasks[taskIndex].Date = time.Now()
+
+	err = writeJSON(fileName, db)
+
+	if err != nil {
+		return fmt.Errorf("writing into file: %w", err)
+	}
+
+	return nil
+}
+
+func RemoveTask(fileName string, taskIndex int) error {
+	softDelete(fileName, taskIndex)
+
+	return nil
+}
+
+func CleanUp(fileName string, retention time.Duration) error {
+	now := time.Now()
+	var keptTasks []Task
+
+	db, err := readJSON(fileName)
+
+	if err != nil {
+		return fmt.Errorf("reading file: %w", err)
+	}
+
+	for _, task := range db.Tasks {
+		if task.IsDeleted == true {
+			keptTasks = append(keptTasks, task)
+		}
+
+		if task.DeletedAt == nil {
+			keptTasks = append(keptTasks, task)
+		}
+
+		if now.Sub(*task.DeletedAt) < retention {
+			keptTasks = append(keptTasks, task)
+		}
+
+		// NOTE: deleted task will not be kept into the db
+	}
+
+	db.Tasks = keptTasks
+
+	err = writeJSON(fileName, db)
+
+	if err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
+
+	return nil
+}
+
+func writeJSON(fileName string, db Database) error {
 	file, err := os.OpenFile(fileName, os.O_TRUNC|os.O_RDWR, 0644)
 
 	if err != nil {
@@ -42,16 +152,12 @@ func AddTask(task *Task, fileName string) error {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "\t")
 
-	err = encoder.Encode(db)
-
-	if err != nil {
-		return fmt.Errorf("encoding file: %w", err)
-	}
+	encoder.Encode(db)
 
 	return nil
 }
 
-func ReadTask(fileName string) (Database, error) {
+func readJSON(fileName string) (Database, error) {
 	var result Database
 
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDONLY, 0644)
@@ -77,79 +183,24 @@ func ReadTask(fileName string) (Database, error) {
 	return result, nil
 }
 
-func ChangeTask(fileName string, taskIndex int, newTitle string, newDescription string) error {
-	if taskIndex < 0 {
-		return errors.New("Index cannot be < 0")
-	}
+func softDelete(fileName string, taskIndex int) error {
+	now := time.Now()
 
-	if newTitle == "" && newDescription == "" {
-		return errors.New("No value is changed")
-	}
-
-	db, err := ReadTask(fileName)
+	db, err := readJSON(fileName)
 
 	if err != nil {
 		return fmt.Errorf("reading file: %w", err)
 	}
 
-	if newTitle == "" {
-		newTitle = db.Tasks[taskIndex].Title
-	}
+	db.Tasks[taskIndex].IsDeleted = true
+	db.Tasks[taskIndex].DeletedAt = &now
+	db.Size--
 
-	if newDescription == "" {
-		newDescription = db.Tasks[taskIndex].Description
-	}
-
-	db.Tasks[taskIndex].Title = newTitle
-	db.Tasks[taskIndex].Description = newDescription
-	db.Tasks[taskIndex].Date = time.Now()
-
-	file, err := os.OpenFile(fileName, os.O_TRUNC|os.O_RDWR, 0644)
+	err = writeJSON(fileName, db)
 
 	if err != nil {
-		return fmt.Errorf("opening file: %w", err)
+		return fmt.Errorf("writing into file: %w", err)
 	}
-
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "\t")
-
-	encoder.Encode(db)
-
-	return nil
-}
-
-func RemoveTask(fileName string, taskIndex int) error {
-	if taskIndex < 0 {
-		return errors.New("Index cannot be < 0")
-	}
-
-	var db Database
-	var err error
-	var file *os.File
-
-	db, err = ReadTask(fileName)
-
-	if err != nil {
-		return fmt.Errorf("reading file: %w", err)
-	}
-
-	db.Tasks = append(db.Tasks[:taskIndex], db.Tasks[taskIndex+1:]...)
-	db.Capacity--
-
-	file, err = os.OpenFile(fileName, os.O_TRUNC|os.O_RDWR, 0644)
-
-	if err != nil {
-		return fmt.Errorf("opening file: %w", err)
-	}
-
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "\t")
-
-	encoder.Encode(db)
 
 	return nil
 }
