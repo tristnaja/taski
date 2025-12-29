@@ -22,14 +22,14 @@ type Database struct {
 	Tasks []Task `json:"tasks"`
 }
 
-func AddTask(task *Task, fileName string) error {
+func AddTask(task Task, fileName string) error {
 	db, err := readJSON(fileName)
 
 	if err != nil {
 		return fmt.Errorf("reading file: %w", err)
 	}
 
-	db.Tasks = append(db.Tasks, *task)
+	db.Tasks = append(db.Tasks, task)
 	db.Size++
 
 	err = writeJSON(fileName, db)
@@ -41,6 +41,7 @@ func AddTask(task *Task, fileName string) error {
 	return nil
 }
 
+// FIX: Some Bug Here, duplicating soft deleted value when taski view
 func ReadTask(fileName string) (Database, error) {
 	var filteredDB Database
 
@@ -127,6 +128,10 @@ func CleanUp(fileName string, retention time.Duration) error {
 		return fmt.Errorf("reading file: %w", err)
 	}
 
+	if db.Tasks == nil {
+		return nil
+	}
+
 	for _, task := range db.Tasks {
 		if task.IsDeleted == true {
 			keptTasks = append(keptTasks, task)
@@ -136,7 +141,7 @@ func CleanUp(fileName string, retention time.Duration) error {
 			keptTasks = append(keptTasks, task)
 		}
 
-		if now.Sub(*task.DeletedAt) < retention {
+		if task.DeletedAt != nil && now.Sub(*task.DeletedAt) < retention {
 			keptTasks = append(keptTasks, task)
 		}
 
@@ -154,7 +159,7 @@ func CleanUp(fileName string, retention time.Duration) error {
 	return nil
 }
 
-func RestoreAll(fileName string, retention time.Duration) error {
+func RestoreAll(fileName string) error {
 	db, err := readJSON(fileName)
 
 	if err != nil {
