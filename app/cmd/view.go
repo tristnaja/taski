@@ -3,20 +3,22 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/tristnaja/taski/internal/io"
 )
 
-func RunView(args []string, fileName string) {
-	cmd := flag.NewFlagSet("view", flag.ExitOnError)
+func RunView(args []string, fileName string) error {
+	cmd := flag.NewFlagSet("view", flag.ContinueOnError)
 	err := cmd.Parse(args)
+
+	if err != nil {
+		return fmt.Errorf("parsing arguments: %w", err)
+	}
 
 	db, err := io.ReadTask(fileName)
 
 	if err != nil {
-		fmt.Printf("viewing task: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("viewing task: %v\n", err)
 	}
 
 	fmt.Println("Here is your Tasks:")
@@ -32,4 +34,6 @@ func RunView(args []string, fileName string) {
 	fmt.Println("\n3. Deleting Task: \ntaski delete --index <index>")
 	fmt.Println("\n4. Restoring Tasks: \ntaski delete --mode <mode> --index <index>")
 	fmt.Println("\n5. Viewing Tasks: \ntaski view")
+
+	return nil
 }

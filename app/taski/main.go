@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/tristnaja/taski/app/cmd"
@@ -13,29 +14,45 @@ import (
 func main() {
 	log.SetPrefix("taski: ")
 	log.SetFlags(0)
-	fileName := "../../bin/data.json"
+	exe, err := os.Executable()
+
+	if err != nil {
+		errLog := fmt.Errorf("locating executables: %w", err)
+		log.Fatal(errLog)
+	}
+
+	fileDir := filepath.Dir(exe)
+	fileName := filepath.Join(fileDir, "data.json")
 	trashDue := 30 * 24 * time.Hour
 
-	io.CleanUp(fileName, trashDue)
+	err = io.CleanUp(fileName, trashDue)
+
+	if err != nil {
+		log.Printf("cleanup failed: %v", err)
+	}
 
 	if len(os.Args) < 2 {
-		fmt.Println("usage: taski <cmd> <args>")
-		fmt.Println("usage: taski add --title <title> --desc <desc>")
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "usage: taski <cmd> <args>")
+		errLog := fmt.Errorf("parsing args: arguments not enough")
+		log.Fatal(errLog)
 	}
 
 	switch os.Args[1] {
 	case "add":
-		cmd.RunAdd(os.Args[2:], fileName)
+		err = cmd.RunAdd(os.Args[2:], fileName)
 	case "change":
-		cmd.RunChange(os.Args[2:], fileName)
+		err = cmd.RunChange(os.Args[2:], fileName)
 	case "delete":
-		cmd.RunDelete(os.Args[2:], fileName)
+		err = cmd.RunDelete(os.Args[2:], fileName)
 	case "restore":
-		cmd.RunRestore(os.Args[2:], fileName)
+		err = cmd.RunRestore(os.Args[2:], fileName)
 	case "view":
-		cmd.RunView(os.Args[2:], fileName)
+		err = cmd.RunView(os.Args[2:], fileName)
 	default:
-		fmt.Println("unknown command, usable: add, change, restore, delete, view")
+		log.Fatal("unknown command, usable: add, change, restore, delete, view")
+	}
+
+	if err != nil {
+		log.Fatal(err)
 	}
 }

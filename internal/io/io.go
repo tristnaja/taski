@@ -75,6 +75,10 @@ func ChangeTask(fileName string, taskIndex int, newTitle string, newDescription 
 
 	db, err := readJSON(fileName)
 
+	if taskIndex >= len(db.Tasks) {
+		return fmt.Errorf("invalid index %d: out of bounds", taskIndex)
+	}
+
 	if err != nil {
 		return fmt.Errorf("reading file: %w", err)
 	}
@@ -166,9 +170,13 @@ func RestoreAll(fileName string) error {
 	}
 
 	for index := range db.Tasks {
-		db.Tasks[index].IsDeleted = false
-		db.Tasks[index].DeletedAt = nil
+		if db.Tasks[index].IsDeleted {
+			db.Tasks[index].IsDeleted = false
+			db.Tasks[index].DeletedAt = nil
+		}
 	}
+
+	db.Size = len(db.Tasks)
 
 	err = writeJSON(fileName, db)
 
@@ -191,7 +199,11 @@ func writeJSON(fileName string, db Database) error {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "\t")
 
-	encoder.Encode(db)
+	err = encoder.Encode(db)
+
+	if err != nil {
+		return fmt.Errorf("encoding task: %w", err)
+	}
 
 	return nil
 }
@@ -231,6 +243,10 @@ func softDelete(fileName string, taskIndex int) error {
 		return fmt.Errorf("reading file: %w", err)
 	}
 
+	if taskIndex < 0 || taskIndex >= len(db.Tasks) {
+		return fmt.Errorf("invalid index %d: out of bounds", taskIndex)
+	}
+
 	db.Tasks[taskIndex].IsDeleted = true
 	db.Tasks[taskIndex].DeletedAt = &now
 	db.Size--
@@ -251,14 +267,20 @@ func restoreTask(fileName string, taskIndex int) error {
 		return fmt.Errorf("reading file: %w", err)
 	}
 
-	db.Tasks[taskIndex].IsDeleted = false
-	db.Tasks[taskIndex].DeletedAt = nil
-	db.Size++
+	if taskIndex < 0 || taskIndex >= len(db.Tasks) {
+		return fmt.Errorf("invalid index %d: out of bounds", taskIndex)
+	}
 
-	err = writeJSON(fileName, db)
+	if db.Tasks[taskIndex].IsDeleted {
+		db.Tasks[taskIndex].IsDeleted = false
+		db.Tasks[taskIndex].DeletedAt = nil
+		db.Size++
 
-	if err != nil {
-		return fmt.Errorf("writing into file: %w", err)
+		err = writeJSON(fileName, db)
+
+		if err != nil {
+			return fmt.Errorf("writing into file: %w", err)
+		}
 	}
 
 	return nil

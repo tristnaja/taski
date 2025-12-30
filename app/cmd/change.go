@@ -3,13 +3,12 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/tristnaja/taski/internal/io"
 )
 
-func RunChange(args []string, fileName string) {
-	cmd := flag.NewFlagSet("change", flag.ExitOnError)
+func RunChange(args []string, fileName string) error {
+	cmd := flag.NewFlagSet("change", flag.ContinueOnError)
 	var index int
 	var title string
 	var description string
@@ -23,16 +22,19 @@ func RunChange(args []string, fileName string) {
 
 	err := cmd.Parse(args)
 
+	if err != nil {
+		return fmt.Errorf("parsing arguments: %w", err)
+	}
+
 	if index == -1 && title == "" || index == -1 && description == "" {
 		cmd.Usage()
-		os.Exit(1)
+		return fmt.Errorf("unfilled arguments")
 	}
 
 	err = io.ChangeTask(fileName, index, title, description)
 
 	if err != nil {
-		fmt.Printf("changing task: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("changing task: %v\n", err)
 	}
 
 	fmt.Println("Changed Task:")
@@ -40,4 +42,6 @@ func RunChange(args []string, fileName string) {
 	fmt.Printf("Index: %d\n", index)
 	fmt.Printf("Description: %v\n", description)
 	fmt.Println("\nTo view, type: taski view")
+
+	return nil
 }

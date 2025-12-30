@@ -3,14 +3,13 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/tristnaja/taski/internal/io"
 )
 
-func RunAdd(args []string, fileName string) {
-	cmd := flag.NewFlagSet("add", flag.ExitOnError)
+func RunAdd(args []string, fileName string) error {
+	cmd := flag.NewFlagSet("add", flag.ContinueOnError)
 	var title string
 	var description string
 
@@ -21,10 +20,13 @@ func RunAdd(args []string, fileName string) {
 
 	err := cmd.Parse(args)
 
+	if err != nil {
+		return fmt.Errorf("parsing arguments: %w", err)
+	}
+
 	if title == "" || description == "" {
-		fmt.Println("usage: taski add --title <title> --desc <description>")
 		cmd.Usage()
-		os.Exit(1)
+		return fmt.Errorf("unfilled arguments")
 	}
 
 	task := io.Task{
@@ -37,12 +39,13 @@ func RunAdd(args []string, fileName string) {
 	err = io.AddTask(task, fileName)
 
 	if err != nil {
-		fmt.Printf("adding task: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("adding task: %v\n", err)
 	}
 
 	fmt.Println("Added New Task:")
 	fmt.Printf("Title: %v\n", title)
 	fmt.Printf("Description: %v\n", description)
 	fmt.Println("\nTo view, type: taski view")
+
+	return nil
 }
