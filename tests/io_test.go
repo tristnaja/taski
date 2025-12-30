@@ -1,5 +1,7 @@
 package tests
 
+// NOTE: AI generated because im lazy
+
 import (
 	"reflect"
 	"testing"
