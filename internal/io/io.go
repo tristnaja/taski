@@ -10,6 +10,7 @@ import (
 )
 
 type Task struct {
+	ID          int        `json:"id"`
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
 	Date        time.Time  `json:"date"`
@@ -29,6 +30,8 @@ func AddTask(task Task, fileName string) error {
 		return fmt.Errorf("reading file: %w", err)
 	}
 
+	task.ID = len(db.Tasks)
+
 	db.Tasks = append(db.Tasks, task)
 	db.Size++
 
@@ -41,7 +44,6 @@ func AddTask(task Task, fileName string) error {
 	return nil
 }
 
-// FIX: Some Bug Here, duplicating soft deleted value when taski view
 func ReadTask(fileName string) (Database, error) {
 	var filteredDB Database
 
@@ -133,19 +135,16 @@ func CleanUp(fileName string, retention time.Duration) error {
 	}
 
 	for _, task := range db.Tasks {
-		if task.IsDeleted == true {
-			keptTasks = append(keptTasks, task)
-		}
-
-		if task.DeletedAt == nil {
-			keptTasks = append(keptTasks, task)
-		}
-
 		if task.DeletedAt != nil && now.Sub(*task.DeletedAt) < retention {
 			keptTasks = append(keptTasks, task)
+		} else if task.IsDeleted == false {
+			keptTasks = append(keptTasks, task)
+		} else if task.DeletedAt == nil {
+			keptTasks = append(keptTasks, task)
+		} else {
+			continue
+			// NOTE: deleted task will not be kept into the db
 		}
-
-		// NOTE: deleted task will not be kept into the db
 	}
 
 	db.Tasks = keptTasks

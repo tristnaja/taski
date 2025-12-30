@@ -31,8 +31,9 @@ func main() {
 		cmd.RunChange(os.Args[2:], fileName)
 	case "delete":
 		cmd.RunDelete(os.Args[2:], fileName)
+	case "restore":
+		cmd.RunRestore(os.Args[2:], fileName)
 	case "view":
-		// FIX: Some Bug Here, duplicating soft deleted value when taski view
 		cmd.RunView(os.Args[2:], fileName)
 	default:
 		fmt.Println("unknown command, usable: add, change, restore, delete, view")

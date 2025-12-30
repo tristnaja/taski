@@ -8,7 +8,6 @@ import (
 	"github.com/tristnaja/taski/internal/io"
 )
 
-// FIX: Some Bug Here, duplicating soft deleted value when taski view
 func RunView(args []string, fileName string) {
 	cmd := flag.NewFlagSet("view", flag.ExitOnError)
 	err := cmd.Parse(args)
@@ -23,7 +22,7 @@ func RunView(args []string, fileName string) {
 	fmt.Println("Here is your Tasks:")
 	for index, task := range db.Tasks {
 		fmt.Printf("%d. %v\n", (index + 1), task.Title)
-		fmt.Printf("index to target: %d\n", index)
+		fmt.Printf("index to target: %d\n", task.ID)
 		fmt.Printf("Date: %v\n", task.Date.Format("02 Jan 2006, 15:04"))
 		fmt.Printf("%v\n\n", task.Description)
 	}
